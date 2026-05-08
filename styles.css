@@ -539,7 +539,17 @@ h2 {
   font-weight: 700;
 }
 
+.sensitive-label {
+  margin: 0.55rem 0 0 !important;
+  color: var(--accent-cool) !important;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.78rem !important;
+  text-transform: uppercase;
+}
+
 .sensitive-output {
+  display: block;
+  width: 100%;
   max-height: 18rem;
   overflow: auto;
   border: 1px solid rgba(207, 119, 119, 0.45);

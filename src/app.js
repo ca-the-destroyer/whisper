@@ -389,13 +389,14 @@ function safeMessage(error) {
   return "The glass stayed dark.";
 }
 
-function recordActiveProbe(name, state, summary, details = [], sensitiveText = "") {
+function recordActiveProbe(name, state, summary, details = [], sensitiveText = "", sensitiveLabel = "Raw revealed value") {
   const result = {
     name,
     state,
     summary,
     details,
     sensitiveText,
+    sensitiveLabel,
     sensitiveTextIncluded: Boolean(sensitiveText),
     observedAt: new Date().toISOString(),
   };
@@ -436,10 +437,14 @@ function renderActiveProbeResults() {
         warning.className = "sensitive-warning";
         warning.textContent = "Sensitive value revealed by explicit user action. Included in JSON export.";
 
+        const label = document.createElement("p");
+        label.className = "sensitive-label";
+        label.textContent = result.sensitiveLabel;
+
         const pre = document.createElement("pre");
         pre.className = "sensitive-output";
         pre.textContent = result.sensitiveText;
-        card.append(warning, pre);
+        card.append(warning, label, pre);
       }
 
       return card;
@@ -474,6 +479,7 @@ async function probeClipboardContent() {
 
   try {
     const text = await navigator.clipboard.readText();
+    const displayed = text.length ? text : "[clipboard text was empty]";
     recordActiveProbe(
       "Clipboard content",
       "available",
@@ -482,7 +488,8 @@ async function probeClipboardContent() {
         "This probe was explicitly selected by the user.",
         "The value is displayed locally and included in the JSON export.",
       ],
-      text,
+      displayed,
+      "Clipboard API returned this exact text",
     );
   } catch (error) {
     recordActiveProbe("Clipboard content", "blocked", safeMessage(error), ["No clipboard content was retained."]);
@@ -550,6 +557,7 @@ async function probePreciseLocation() {
       "Precise geolocation was revealed locally by explicit user action.",
       ["This may expose sensitive physical location.", "Included in JSON export."],
       details.join("\n"),
+      "Geolocation API returned these fields",
     );
   } catch (error) {
     recordActiveProbe("Precise location", "blocked", safeMessage(error), ["No precise coordinates were retained."]);
@@ -601,7 +609,8 @@ async function probeMediaIdentifiers() {
         ? `${devices.length} media device identifier records were revealed locally.`
         : "No media device identifiers were offered.",
       ["This can expose stable-ish device correlation data.", "Included in JSON export."],
-      sensitive,
+      sensitive || "[no media identifiers were offered]",
+      "MediaDevices API returned these identifiers",
     );
   } catch (error) {
     recordActiveProbe("Media identifiers", "blocked", safeMessage(error), ["No media identifiers were retained."]);
@@ -645,7 +654,8 @@ function probeHiddenFields() {
       "Scope is the current whispers document only.",
       "This cannot inspect other browser tabs, other sites, or cross-origin documents.",
     ],
-    sensitive,
+    sensitive || "[no hidden or obscured fields were found]",
+    "Current document hidden/obscured node values",
   );
 }
 
