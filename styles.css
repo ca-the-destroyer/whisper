@@ -477,6 +477,13 @@ h2 {
   outline: none;
 }
 
+.probe-button--sensitive {
+  border-color: rgba(207, 119, 119, 0.55);
+  background:
+    linear-gradient(135deg, rgba(207, 119, 119, 0.12), transparent 55%),
+    var(--panel);
+}
+
 .probe-button:disabled {
   cursor: wait;
   opacity: 0.58;
@@ -524,6 +531,28 @@ h2 {
   margin: 0.65rem 0 0;
   padding-left: 1rem;
   color: var(--muted);
+}
+
+.sensitive-warning {
+  margin-top: 0.75rem !important;
+  color: var(--bad) !important;
+  font-weight: 700;
+}
+
+.sensitive-output {
+  max-height: 18rem;
+  overflow: auto;
+  border: 1px solid rgba(207, 119, 119, 0.45);
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.42);
+  color: var(--text);
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  margin: 0.65rem 0 0;
+  padding: 0.75rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .aside-line {

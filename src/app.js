@@ -389,12 +389,14 @@ function safeMessage(error) {
   return "The glass stayed dark.";
 }
 
-function recordActiveProbe(name, state, summary, details = []) {
+function recordActiveProbe(name, state, summary, details = [], sensitiveText = "") {
   const result = {
     name,
     state,
     summary,
     details,
+    sensitiveText,
+    sensitiveTextIncluded: Boolean(sensitiveText),
     observedAt: new Date().toISOString(),
   };
   activeProbeResults.unshift(result);
@@ -429,6 +431,17 @@ function renderActiveProbeResults() {
         card.append(list);
       }
 
+      if (result.sensitiveTextIncluded) {
+        const warning = document.createElement("p");
+        warning.className = "sensitive-warning";
+        warning.textContent = "Sensitive value revealed by explicit user action. Included in JSON export.";
+
+        const pre = document.createElement("pre");
+        pre.className = "sensitive-output";
+        pre.textContent = result.sensitiveText;
+        card.append(warning, pre);
+      }
+
       return card;
     }),
   );
@@ -450,6 +463,29 @@ async function probeClipboard(button) {
     );
   } catch (error) {
     recordActiveProbe("Clipboard text length", "blocked", safeMessage(error), ["No clipboard content was retained."]);
+  }
+}
+
+async function probeClipboardContent() {
+  if (!navigator.clipboard?.readText) {
+    recordActiveProbe("Clipboard content", "unsupported", "The clipboard API was not offered here.");
+    return;
+  }
+
+  try {
+    const text = await navigator.clipboard.readText();
+    recordActiveProbe(
+      "Clipboard content",
+      "available",
+      text ? `Clipboard content was revealed locally: ${text.length} characters.` : "Clipboard text was readable but empty.",
+      [
+        "This probe was explicitly selected by the user.",
+        "The value is displayed locally and included in the JSON export.",
+      ],
+      text,
+    );
+  } catch (error) {
+    recordActiveProbe("Clipboard content", "blocked", safeMessage(error), ["No clipboard content was retained."]);
   }
 }
 
@@ -582,6 +618,7 @@ async function runActiveProbe(button) {
   button.textContent = "Running...";
   try {
     if (probe === "clipboard") await probeClipboard(button);
+    if (probe === "clipboard-content") await probeClipboardContent();
     if (probe === "geolocation") await probeGeolocation();
     if (probe === "media") await probeMediaDevices();
     if (probe === "webrtc") await probeWebRtcCandidates();
@@ -608,7 +645,8 @@ function buildReport() {
       networkCallsMadeByPage: false,
       persistentStorageWritesMadeByPage: false,
       activePermissionPromptsOpened: activeNames.has("Location prompt"),
-      clipboardReadAttempted: activeNames.has("Clipboard text length"),
+      clipboardReadAttempted: activeNames.has("Clipboard text length") || activeNames.has("Clipboard content"),
+      clipboardContentRevealed: activeNames.has("Clipboard content"),
       mediaDeviceEnumerationAttempted: activeNames.has("Media device list"),
       geolocationPromptAttempted: activeNames.has("Location prompt"),
       webRtcIpDiscoveryAttempted: activeNames.has("WebRTC local candidates"),
