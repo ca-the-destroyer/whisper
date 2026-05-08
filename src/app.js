@@ -519,6 +519,43 @@ async function probeGeolocation() {
   }
 }
 
+async function probePreciseLocation() {
+  if (!navigator.geolocation?.getCurrentPosition) {
+    recordActiveProbe("Precise location", "unsupported", "Geolocation was not offered here.");
+    return;
+  }
+
+  try {
+    const position = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 15000,
+      });
+    });
+    const coords = position.coords;
+    const details = [
+      `Latitude: ${coords.latitude}`,
+      `Longitude: ${coords.longitude}`,
+      `Accuracy meters: ${coords.accuracy}`,
+      `Altitude: ${coords.altitude ?? "not offered"}`,
+      `Altitude accuracy: ${coords.altitudeAccuracy ?? "not offered"}`,
+      `Heading: ${coords.heading ?? "not offered"}`,
+      `Speed: ${coords.speed ?? "not offered"}`,
+      `Timestamp: ${new Date(position.timestamp).toISOString()}`,
+    ];
+    recordActiveProbe(
+      "Precise location",
+      "available",
+      "Precise geolocation was revealed locally by explicit user action.",
+      ["This may expose sensitive physical location.", "Included in JSON export."],
+      details.join("\n"),
+    );
+  } catch (error) {
+    recordActiveProbe("Precise location", "blocked", safeMessage(error), ["No precise coordinates were retained."]);
+  }
+}
+
 async function probeMediaDevices() {
   if (!navigator.mediaDevices?.enumerateDevices) {
     recordActiveProbe("Media device list", "unsupported", "Media device enumeration was not offered here.");
@@ -540,6 +577,76 @@ async function probeMediaDevices() {
   } catch (error) {
     recordActiveProbe("Media device list", "blocked", safeMessage(error), ["No device list was retained."]);
   }
+}
+
+async function probeMediaIdentifiers() {
+  if (!navigator.mediaDevices?.enumerateDevices) {
+    recordActiveProbe("Media identifiers", "unsupported", "Media device enumeration was not offered here.");
+    return;
+  }
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const sensitive = devices.map((device, index) => [
+      `Device ${index + 1}`,
+      `kind: ${device.kind}`,
+      `label: ${device.label || "label withheld"}`,
+      `deviceId: ${device.deviceId || "not offered"}`,
+      `groupId: ${device.groupId || "not offered"}`,
+    ].join("\n")).join("\n\n");
+    recordActiveProbe(
+      "Media identifiers",
+      devices.length ? "available" : "unavailable",
+      devices.length
+        ? `${devices.length} media device identifier records were revealed locally.`
+        : "No media device identifiers were offered.",
+      ["This can expose stable-ish device correlation data.", "Included in JSON export."],
+      sensitive,
+    );
+  } catch (error) {
+    recordActiveProbe("Media identifiers", "blocked", safeMessage(error), ["No media identifiers were retained."]);
+  }
+}
+
+function probeHiddenFields() {
+  const selectors = [
+    "input[type='hidden']",
+    "input[type='password']",
+    "input[aria-hidden='true']",
+    "textarea[aria-hidden='true']",
+    "[hidden]",
+    "[aria-hidden='true']",
+  ];
+  const nodes = [...document.querySelectorAll(selectors.join(","))]
+    .filter((node) => !node.closest("#activeProbeResults"));
+
+  const sensitive = nodes.map((node, index) => {
+    const tag = node.tagName.toLowerCase();
+    const type = node.getAttribute("type") || "";
+    const name = node.getAttribute("name") || "";
+    const id = node.id || "";
+    const value = "value" in node ? node.value : node.textContent;
+    return [
+      `Node ${index + 1}`,
+      `selector: ${tag}${type ? `[type=${type}]` : ""}`,
+      `id: ${id || "not offered"}`,
+      `name: ${name || "not offered"}`,
+      `value/text: ${value || "empty"}`,
+    ].join("\n");
+  }).join("\n\n");
+
+  recordActiveProbe(
+    "Page hidden fields",
+    nodes.length ? "available" : "unavailable",
+    nodes.length
+      ? `${nodes.length} hidden or obscured current-page nodes were revealed.`
+      : "No hidden or obscured fields were found in this page.",
+    [
+      "Scope is the current whispers document only.",
+      "This cannot inspect other browser tabs, other sites, or cross-origin documents.",
+    ],
+    sensitive,
+  );
 }
 
 async function probeWebRtcCandidates() {
@@ -620,7 +727,10 @@ async function runActiveProbe(button) {
     if (probe === "clipboard") await probeClipboard(button);
     if (probe === "clipboard-content") await probeClipboardContent();
     if (probe === "geolocation") await probeGeolocation();
+    if (probe === "precise-location") await probePreciseLocation();
     if (probe === "media") await probeMediaDevices();
+    if (probe === "media-identifiers") await probeMediaIdentifiers();
+    if (probe === "hidden-fields") probeHiddenFields();
     if (probe === "webrtc") await probeWebRtcCandidates();
     if (probe === "keyboard") await probeKeyboardLayout();
     if (probe === "persistence") await probePersistence();
@@ -648,7 +758,10 @@ function buildReport() {
       clipboardReadAttempted: activeNames.has("Clipboard text length") || activeNames.has("Clipboard content"),
       clipboardContentRevealed: activeNames.has("Clipboard content"),
       mediaDeviceEnumerationAttempted: activeNames.has("Media device list"),
+      mediaIdentifiersRevealed: activeNames.has("Media identifiers"),
       geolocationPromptAttempted: activeNames.has("Location prompt"),
+      preciseLocationRevealed: activeNames.has("Precise location"),
+      hiddenFieldsRevealed: activeNames.has("Page hidden fields"),
       webRtcIpDiscoveryAttempted: activeNames.has("WebRTC local candidates"),
       persistentStorageRequestAttempted: activeNames.has("Persistent storage request"),
     },
