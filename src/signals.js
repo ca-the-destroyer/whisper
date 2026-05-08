@@ -342,6 +342,347 @@ function getUserAgentSignals() {
   ];
 }
 
+function supportSignal(label, category, supported, source, detailSupported, detailMissing, sensitivity = "medium") {
+  return makeSignal(
+    label,
+    category,
+    supported ? STATES.available : STATES.unsupported,
+    supported ? "supported" : "",
+    supported ? detailSupported : detailMissing,
+    source,
+    sensitivity,
+    supported
+      ? ["capability detected", "no active probe run", "state stayed local"]
+      : ["capability checked", "not offered here"],
+  );
+}
+
+function getStorageCapabilitySignals() {
+  let indexedDbSupported = false;
+  try {
+    indexedDbSupported = Boolean(window.indexedDB);
+  } catch {
+    indexedDbSupported = false;
+  }
+
+  let localStorageSupported = false;
+  try {
+    localStorageSupported = Boolean(window.localStorage);
+  } catch {
+    localStorageSupported = false;
+  }
+
+  let sessionStorageSupported = false;
+  try {
+    sessionStorageSupported = Boolean(window.sessionStorage);
+  } catch {
+    sessionStorageSupported = false;
+  }
+
+  return [
+    supportSignal(
+      "IndexedDB capability",
+      "storage",
+      indexedDbSupported,
+      "window.indexedDB",
+      "The local database door exists. The page did not open it.",
+      "The local database door was not offered.",
+      "medium",
+    ),
+    supportSignal(
+      "Cache API capability",
+      "storage",
+      Boolean(window.caches),
+      "window.caches",
+      "The cache shelf exists. The page did not write to it.",
+      "The cache shelf was not offered.",
+      "medium",
+    ),
+    supportSignal(
+      "Local storage capability",
+      "storage",
+      localStorageSupported,
+      "window.localStorage",
+      "Persistent key-value storage exists. The page did not write to it.",
+      "Persistent key-value storage was not offered.",
+      "high",
+    ),
+    supportSignal(
+      "Session storage capability",
+      "storage",
+      sessionStorageSupported,
+      "window.sessionStorage",
+      "Tab-scoped storage exists. The page did not write to it.",
+      "Tab-scoped storage was not offered.",
+      "medium",
+    ),
+  ];
+}
+
+function getSecurityContextSignals() {
+  const protocol = window.location.protocol || "";
+  const origin = window.location.origin === "null" ? "" : window.location.origin;
+  return [
+    makeSignal(
+      "Secure context",
+      "security",
+      STATES.available,
+      window.isSecureContext ? "secure" : "not secure",
+      window.isSecureContext ? "The browser marked this as a secure context." : "Some doors stay closed outside a secure context.",
+      "window.isSecureContext",
+      "low",
+      ["read security context flag", "explains API availability"],
+    ),
+    makeSignal(
+      "Protocol",
+      "security",
+      protocol ? STATES.available : STATES.unavailable,
+      protocol || "",
+      protocol ? "The page named its transport shell." : "The transport shell stayed unnamed.",
+      "window.location.protocol",
+      "low",
+      ["read current protocol", "no navigation performed"],
+    ),
+    makeSignal(
+      "Origin",
+      "security",
+      origin ? STATES.available : STATES.unavailable,
+      origin || "",
+      origin ? "The page named its origin." : "The origin was not offered here.",
+      "window.location.origin",
+      "medium",
+      ["read current origin", "file pages may report no origin"],
+    ),
+    makeSignal(
+      "Cross-origin isolation",
+      "security",
+      STATES.available,
+      window.crossOriginIsolated ? "isolated" : "not isolated",
+      window.crossOriginIsolated ? "The page is cross-origin isolated." : "The page is not cross-origin isolated.",
+      "window.crossOriginIsolated",
+      "low",
+    ),
+  ];
+}
+
+function getTimelineSignals(navEntry) {
+  const resources = performance.getEntriesByType?.("resource") || [];
+  const paints = performance.getEntriesByType?.("paint") || [];
+  const started = window.WHISPERS_SESSION_STARTED_AT || "";
+  return [
+    makeSignal(
+      "Scan started",
+      "timeline",
+      started ? STATES.available : STATES.unavailable,
+      started,
+      started ? "The session start marker was set before collection." : "The start marker was not offered.",
+      "window.WHISPERS_SESSION_STARTED_AT",
+      "low",
+      ["created in memory", "not persisted", "included in export"],
+    ),
+    makeSignal(
+      "Document readiness",
+      "timeline",
+      STATES.available,
+      document.readyState,
+      "The document reported its readiness state.",
+      "document.readyState",
+      "low",
+    ),
+    makeSignal(
+      "Visibility state",
+      "timeline",
+      STATES.available,
+      document.visibilityState,
+      "The page reported whether it was visible at scan time.",
+      "document.visibilityState",
+      "low",
+    ),
+    makeSignal(
+      "Focus state",
+      "timeline",
+      STATES.available,
+      document.hasFocus() ? "focused" : "not focused",
+      "The page reported whether it held focus at scan time.",
+      "document.hasFocus",
+      "low",
+    ),
+    makeSignal(
+      "Resource timing count",
+      "timeline",
+      STATES.available,
+      `${resources.length} entries`,
+      "The performance ledger counted locally loaded resources.",
+      "performance.getEntriesByType(resource)",
+      "medium",
+      ["read resource timing entries", "did not fetch anything new"],
+    ),
+    makeSignal(
+      "Paint timing",
+      "timeline",
+      paints.length ? STATES.available : STATES.unavailable,
+      paints.map((entry) => `${entry.name}: ${Math.round(entry.startTime)} ms`),
+      paints.length ? "The renderer offered paint timing." : "The renderer offered no paint timing.",
+      "performance.getEntriesByType(paint)",
+      "low",
+    ),
+    makeSignal(
+      "Unload timing",
+      "timeline",
+      navEntry && Number.isFinite(navEntry.duration) ? STATES.available : STATES.unavailable,
+      navEntry && Number.isFinite(navEntry.duration) ? `${Math.round(navEntry.duration)} ms observed so far` : "",
+      navEntry && Number.isFinite(navEntry.duration) ? "The navigation entry reported a local duration." : "The navigation duration stayed dark.",
+      "PerformanceNavigationTiming.duration",
+      "low",
+    ),
+  ];
+}
+
+function getInputCapabilitySignals() {
+  const hoverQuery = window.matchMedia?.("(hover: hover)");
+  const anyPointerFine = window.matchMedia?.("(any-pointer: fine)");
+  return [
+    makeSignal(
+      "Hover capability",
+      "input",
+      STATES.available,
+      hoverQuery?.matches ? "hover available" : "hover not primary",
+      "The page read whether hover is part of the primary input.",
+      "matchMedia(hover)",
+      "low",
+    ),
+    makeSignal(
+      "Any fine pointer",
+      "input",
+      STATES.available,
+      anyPointerFine?.matches ? "fine pointer present" : "fine pointer not offered",
+      "The page checked whether any precise pointer is present.",
+      "matchMedia(any-pointer)",
+      "low",
+    ),
+    supportSignal(
+      "Keyboard API capability",
+      "input",
+      Boolean(navigator.keyboard),
+      "navigator.keyboard",
+      "The Keyboard API exists. The page did not request layout details.",
+      "The Keyboard API was not offered.",
+      "medium",
+    ),
+    supportSignal(
+      "Gamepad API capability",
+      "input",
+      Boolean(navigator.getGamepads),
+      "navigator.getGamepads",
+      "The Gamepad API exists. The page did not poll devices.",
+      "The Gamepad API was not offered.",
+      "medium",
+    ),
+  ];
+}
+
+function getNetworkCapabilitySignals() {
+  return [
+    supportSignal(
+      "Service worker capability",
+      "network",
+      Boolean(navigator.serviceWorker),
+      "navigator.serviceWorker",
+      "Service workers are supported. The page did not register one.",
+      "Service workers were not offered here.",
+      "medium",
+    ),
+    supportSignal(
+      "WebRTC capability",
+      "network",
+      Boolean(window.RTCPeerConnection),
+      "window.RTCPeerConnection",
+      "WebRTC exists. The page did not create a peer connection or probe IPs.",
+      "WebRTC was not offered here.",
+      "high",
+    ),
+    supportSignal(
+      "Beacon capability",
+      "network",
+      Boolean(navigator.sendBeacon),
+      "navigator.sendBeacon",
+      "Beacon transport exists. The page did not send one.",
+      "Beacon transport was not offered.",
+      "high",
+    ),
+  ];
+}
+
+function getWeakIndicatorSignals() {
+  const ua = navigator.userAgent || "";
+  const webdriver = navigator.webdriver;
+  const headlessHint = /HeadlessChrome|Headless/i.test(ua);
+  const tinyViewport = window.innerWidth <= 800 && window.innerHeight <= 650;
+  return [
+    makeSignal(
+      "WebDriver flag",
+      "weak indicators",
+      typeof webdriver === "boolean" ? STATES.available : STATES.unavailable,
+      typeof webdriver === "boolean" ? (webdriver ? "true" : "false") : "",
+      typeof webdriver === "boolean" ? "The browser exposed an automation hint. This is not proof by itself." : "No WebDriver flag was offered.",
+      "navigator.webdriver",
+      "high",
+      ["read weak automation hint", "do not treat as proof"],
+    ),
+    makeSignal(
+      "Headless user-agent hint",
+      "weak indicators",
+      STATES.available,
+      headlessHint ? "present" : "not present",
+      headlessHint ? "The user agent contains a headless hint." : "No headless token appeared in the user agent.",
+      "navigator.userAgent",
+      "medium",
+      ["read user agent token", "weak indicator only"],
+    ),
+    makeSignal(
+      "Small viewport hint",
+      "weak indicators",
+      STATES.available,
+      tinyViewport ? "small viewport" : "ordinary viewport",
+      tinyViewport ? "The viewport is small enough to be automation-like or simply compact." : "The viewport size is not especially small.",
+      "window.innerWidth / innerHeight",
+      "low",
+      ["read viewport dimensions", "weak indicator only"],
+    ),
+  ];
+}
+
+function getFontSignals() {
+  if (!document.fonts?.check) {
+    return [
+      makeSignal(
+        "Font check capability",
+        "rendering",
+        STATES.unsupported,
+        "",
+        "The Font Loading API was not offered.",
+        "document.fonts.check",
+        "medium",
+      ),
+    ];
+  }
+
+  const candidates = ["Arial", "Calibri", "Consolas", "Courier New", "Times New Roman", "Segoe UI"];
+  const offered = candidates.filter((font) => document.fonts.check(`12px "${font}"`));
+  return [
+    makeSignal(
+      "Font availability sample",
+      "rendering",
+      offered.length ? STATES.available : STATES.unavailable,
+      offered.length ? offered : "",
+      offered.length ? "A small common-font sample answered." : "The common-font sample stayed dark.",
+      "document.fonts.check",
+      "high",
+      ["checked six common names", "no broad font enumeration", "kept result local"],
+    ),
+  ];
+}
+
 async function collectSignals() {
   const motionQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)");
   const colorQuery = window.matchMedia?.("(prefers-color-scheme: dark)");
@@ -350,6 +691,8 @@ async function collectSignals() {
   const transparencyQuery = window.matchMedia?.("(prefers-reduced-transparency: reduce)");
   const navEntry = performance.getEntriesByType?.("navigation")?.[0];
   const signals = [
+    ...getSecurityContextSignals(),
+    ...getTimelineSignals(navEntry),
     safeSignal("Local hour", "environment", () =>
       makeSignal("Local hour", "environment", STATES.available, new Date().toLocaleTimeString([], {
         hour: "2-digit",
@@ -471,6 +814,7 @@ async function collectSignals() {
         ? makeSignal("Do Not Track", "identity", STATES.available, value, "A boundary flag was visible.", "navigator.doNotTrack", "medium")
         : makeSignal("Do Not Track", "identity", STATES.unavailable, "", "No boundary flag was offered.", "navigator.doNotTrack", "medium");
     }),
+    ...getStorageCapabilitySignals(),
     safeSignal("Color scheme", "environment", () =>
       makeSignal(
         "Color scheme",
@@ -539,6 +883,7 @@ async function collectSignals() {
         "medium",
       ),
     ),
+    ...getInputCapabilitySignals(),
     safeSignal("Online flag", "network",
       () => makeSignal(
         "Online flag",
@@ -568,6 +913,7 @@ async function collectSignals() {
           ])
         : makeSignal("Connection", "network", STATES.unavailable, "", "The network offered no silhouette.", "navigator.connection", "medium");
     }),
+    ...getNetworkCapabilitySignals(),
     safeSignal("Referrer", "navigation", () =>
       document.referrer
         ? makeSignal("Referrer", "navigation", STATES.available, document.referrer, "The doorway remembered where it was entered from.", "document.referrer", "medium")
@@ -641,6 +987,7 @@ async function collectSignals() {
           )
         : makeSignal("JavaScript heap", "performance", STATES.unsupported, "", "The engine kept its pressure gauge covered.", "performance.memory", "medium");
     }),
+    ...getWeakIndicatorSignals(),
     safeSignal("Media devices", "permissions", () =>
       navigator.mediaDevices?.enumerateDevices
         ? makeSignal("Media devices", "permissions", STATES.notRequested, "", "We saw the device desk and left it alone.", "navigator.mediaDevices.enumerateDevices", "high", [
@@ -664,6 +1011,7 @@ async function collectSignals() {
     ),
     safeSignal("Graphics hand", "graphics", getWebGlSignal),
     safeSignal("Canvas echo", "graphics", getCanvasSignal),
+    ...getFontSignals(),
     ...getUserAgentSignals(),
   ];
 
@@ -673,6 +1021,10 @@ async function collectSignals() {
     withTimeout(getPermissionSignal("notifications", "Notification permission"), asyncFallback("Notification permission", "permissions", "navigator.permissions.query(notifications)")),
     withTimeout(getPermissionSignal("camera", "Camera permission"), asyncFallback("Camera permission", "permissions", "navigator.permissions.query(camera)")),
     withTimeout(getPermissionSignal("microphone", "Microphone permission"), asyncFallback("Microphone permission", "permissions", "navigator.permissions.query(microphone)")),
+    withTimeout(getPermissionSignal("clipboard-read", "Clipboard read permission"), asyncFallback("Clipboard read permission", "permissions", "navigator.permissions.query(clipboard-read)")),
+    withTimeout(getPermissionSignal("clipboard-write", "Clipboard write permission"), asyncFallback("Clipboard write permission", "permissions", "navigator.permissions.query(clipboard-write)")),
+    withTimeout(getPermissionSignal("persistent-storage", "Persistent storage permission"), asyncFallback("Persistent storage permission", "permissions", "navigator.permissions.query(persistent-storage)")),
+    withTimeout(getPermissionSignal("idle-detection", "Idle detection permission"), asyncFallback("Idle detection permission", "permissions", "navigator.permissions.query(idle-detection)")),
     withTimeout(getBatterySignal(), asyncFallback("Battery", "device", "navigator.getBattery")),
   ]);
 

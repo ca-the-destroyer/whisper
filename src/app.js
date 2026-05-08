@@ -11,6 +11,7 @@ const els = {
   scanTargetGrid: document.querySelector("#scanTargetGrid"),
   ledgerStandby: document.querySelector("#ledgerStandby"),
   ledgerGrid: document.querySelector("#ledgerGrid"),
+  exportReport: document.querySelector("#exportReport"),
   breadcrumbList: document.querySelector("#breadcrumbList"),
   machineryToggle: document.querySelector("#machineryToggle"),
   machineryPanel: document.querySelector("#machineryPanel"),
@@ -23,6 +24,7 @@ const els = {
   marginSecret: document.querySelector("#marginSecret"),
 };
 
+window.WHISPERS_SESSION_STARTED_AT = window.WHISPERS_SESSION_STARTED_AT || new Date().toISOString();
 let signals = [];
 let discoveredSignals = [];
 let machineryOpened = false;
@@ -263,6 +265,7 @@ async function runScanSequence() {
   renderBreadcrumbs();
   renderCategoryControls();
   await updateFingerprint();
+  els.exportReport.disabled = false;
   els.ledgerStandby.hidden = true;
   if (!reducedMotion) await wait(700);
   els.scanOverlay.hidden = true;
@@ -325,6 +328,53 @@ function renderCategoryControls() {
   );
 }
 
+function buildReport() {
+  return {
+    report: "whispers local telemetry scan",
+    generatedAt: new Date().toISOString(),
+    sessionStartedAt: window.WHISPERS_SESSION_STARTED_AT,
+    location: {
+      protocol: window.location.protocol,
+      origin: window.location.origin === "null" ? "not offered" : window.location.origin,
+      pathname: window.location.pathname,
+    },
+    privacy: {
+      networkCallsMadeByPage: false,
+      persistentStorageWritesMadeByPage: false,
+      activePermissionPromptsOpened: false,
+      clipboardReadAttempted: false,
+      mediaDeviceEnumerationAttempted: false,
+      geolocationPromptAttempted: false,
+      webRtcIpDiscoveryAttempted: false,
+    },
+    signals: signals.map((signal) => ({
+      label: signal.label,
+      category: signal.category,
+      state: signal.state,
+      value: valueToText(signal.value) || "not offered",
+      source: signal.source || "browser surface",
+      sensitivity: signal.sensitivity || "low",
+      detail: signal.detail || "",
+      breadcrumb: signal.crumb || [],
+      entries: signal.details || [],
+    })),
+  };
+}
+
+function downloadReport() {
+  const blob = new Blob([JSON.stringify(buildReport(), null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `whispers-report-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 async function digest(text) {
   if (!crypto?.subtle) return "Hashing is not supported here.";
   const bytes = new TextEncoder().encode(text);
@@ -359,6 +409,8 @@ function setDisclosure(button, panel, open) {
 }
 
 function bindDisclosures() {
+  els.exportReport.addEventListener("click", downloadReport);
+
   els.machineryToggle.addEventListener("click", () => {
     const open = els.machineryPanel.hidden;
     machineryOpened = machineryOpened || open;
