@@ -94,6 +94,15 @@ function renderLedger() {
       source.textContent = signal.source || "browser surface";
       detailPanel.append(source);
 
+      const explainer = document.createElement("div");
+      explainer.className = "detail-explainer";
+      for (const paragraph of describeSignal(signal)) {
+        const line = document.createElement("p");
+        line.textContent = paragraph;
+        explainer.append(line);
+      }
+      detailPanel.append(explainer);
+
       const facts = document.createElement("dl");
       facts.className = "detail-facts";
       for (const [name, data] of [
@@ -154,6 +163,47 @@ function renderLedger() {
     return article;
   });
   els.ledgerGrid.replaceChildren(...cards);
+}
+
+function describeSignal(signal) {
+  const value = valueToText(signal.value);
+  const stateText = {
+    available: "This observation returned a value during the local scan.",
+    unavailable: "This observation was attempted passively, but the browser did not provide a usable value.",
+    blocked: "This observation was refused or denied by the browser environment.",
+    unsupported: "This browser does not appear to expose this capability here.",
+    "not-requested": "This capability may exist, but the page deliberately did not activate it.",
+  }[signal.state] || "This observation produced a restrained result.";
+
+  const categoryText = {
+    device: "Device telemetry helps compare the runtime shape of the browser, but it is not a hardware inventory.",
+    environment: "Environment telemetry describes user-agent preferences and local presentation context.",
+    graphics: "Rendering telemetry can help distinguish browser or GPU environments, and can be fingerprint-sensitive.",
+    identity: "Identity-surface telemetry describes browser-exposed labels. It can be spoofed and should not be treated as proof.",
+    input: "Input telemetry describes interaction capability, not the person using the device.",
+    navigation: "Navigation telemetry explains how this page was reached and loaded inside this tab.",
+    network: "Network telemetry is capability and coarse-status only; this page does not make outbound probes.",
+    performance: "Performance telemetry is a local runtime gauge and varies with browser state.",
+    permissions: "Permission telemetry reads browser permission state only and does not open prompts.",
+    rendering: "Rendering telemetry is a small local sample, not a full rendering fingerprint.",
+    security: "Security telemetry explains which browser protections or constraints apply to this page.",
+    storage: "Storage telemetry describes capability or quota posture; this page does not write persistent data.",
+    timeline: "Timeline telemetry helps reconstruct the page session sequence inside this tab.",
+    "weak indicators": "Weak indicators are hints only. They are useful for triage, not attribution.",
+  }[signal.category] || "This telemetry describes a browser-exposed surface.";
+
+  const privacyText = {
+    high: "Privacy note: treat this as sensitive. The result stays local and is included only in the on-page report/export.",
+    medium: "Privacy note: this can contribute to browser fingerprinting, so the page keeps it local.",
+    low: "Privacy note: this is relatively low sensitivity, but still remains local.",
+    withheld: "Privacy note: the browser did not offer a timely value, and the page continued without inventing one.",
+  }[signal.sensitivity || "low"];
+
+  const proofText = signal.state === "available" && value
+    ? `Observed value: ${value}. This is what the browser offered at scan time, not an independent verification.`
+    : "Observed value: not offered. Absence is recorded without substituting a fake value.";
+
+  return [stateText, categoryText, proofText, privacyText];
 }
 
 function setScanProgress(current, total, label) {

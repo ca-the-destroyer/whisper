@@ -710,6 +710,19 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.detail-explainer {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: 0.9rem;
+}
+
+.detail-explainer p {
+  margin: 0 !important;
+  color: var(--muted) !important;
+  font-size: 0.86rem !important;
+  line-height: 1.45 !important;
+}
+
 .detail-facts {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
