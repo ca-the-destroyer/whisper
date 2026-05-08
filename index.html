@@ -84,6 +84,39 @@
           </div>
         </section>
 
+        <section class="section active-probes" id="active-probes" data-toc="Active Probes">
+          <div class="section__label">Active probes</div>
+          <div>
+            <h2>Optional active checks</h2>
+            <p class="section-intro">
+              These checks run only when selected. They may trigger browser
+              permission prompts or inspect sensitive local surfaces, and the
+              results remain in this page.
+            </p>
+            <div class="probe-grid">
+              <button class="probe-button" type="button" data-probe="clipboard">
+                Clipboard text length
+              </button>
+              <button class="probe-button" type="button" data-probe="geolocation">
+                Location prompt
+              </button>
+              <button class="probe-button" type="button" data-probe="media">
+                Media device list
+              </button>
+              <button class="probe-button" type="button" data-probe="webrtc">
+                WebRTC local candidates
+              </button>
+              <button class="probe-button" type="button" data-probe="keyboard">
+                Keyboard layout map
+              </button>
+              <button class="probe-button" type="button" data-probe="persistence">
+                Persistent storage request
+              </button>
+            </div>
+            <div id="activeProbeResults" class="probe-results" aria-live="polite"></div>
+          </div>
+        </section>
+
         <section class="section crumbs" id="breadcrumbs" data-toc="Breadcrumbs">
           <div class="section__label">Breadcrumbs</div>
           <div>

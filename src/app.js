@@ -12,6 +12,7 @@ const els = {
   ledgerStandby: document.querySelector("#ledgerStandby"),
   ledgerGrid: document.querySelector("#ledgerGrid"),
   exportReport: document.querySelector("#exportReport"),
+  activeProbeResults: document.querySelector("#activeProbeResults"),
   breadcrumbList: document.querySelector("#breadcrumbList"),
   machineryToggle: document.querySelector("#machineryToggle"),
   machineryPanel: document.querySelector("#machineryPanel"),
@@ -27,6 +28,7 @@ const els = {
 window.WHISPERS_SESSION_STARTED_AT = window.WHISPERS_SESSION_STARTED_AT || new Date().toISOString();
 let signals = [];
 let discoveredSignals = [];
+const activeProbeResults = [];
 let machineryOpened = false;
 let scanComplete = false;
 const selectedCategories = new Set(["environment", "device"]);
@@ -378,7 +380,221 @@ function renderCategoryControls() {
   );
 }
 
+function safeMessage(error) {
+  const name = error?.name || "withheld";
+  if (name === "NotAllowedError") return "The browser refused on your behalf.";
+  if (name === "NotFoundError") return "No matching surface was offered.";
+  if (name === "NotSupportedError") return "This door does not exist here.";
+  if (name === "SecurityError") return "The security context kept the door sealed.";
+  return "The glass stayed dark.";
+}
+
+function recordActiveProbe(name, state, summary, details = []) {
+  const result = {
+    name,
+    state,
+    summary,
+    details,
+    observedAt: new Date().toISOString(),
+  };
+  activeProbeResults.unshift(result);
+  renderActiveProbeResults();
+}
+
+function renderActiveProbeResults() {
+  els.activeProbeResults.replaceChildren(
+    ...activeProbeResults.map((result) => {
+      const card = document.createElement("article");
+      card.className = "probe-result";
+      card.dataset.state = result.state;
+
+      const title = document.createElement("h3");
+      title.textContent = result.name;
+
+      const summary = document.createElement("p");
+      summary.textContent = result.summary;
+
+      const stamp = document.createElement("small");
+      stamp.textContent = result.observedAt;
+
+      card.append(title, summary, stamp);
+
+      if (result.details.length) {
+        const list = document.createElement("ul");
+        for (const detail of result.details) {
+          const item = document.createElement("li");
+          item.textContent = detail;
+          list.append(item);
+        }
+        card.append(list);
+      }
+
+      return card;
+    }),
+  );
+}
+
+async function probeClipboard(button) {
+  if (!navigator.clipboard?.readText) {
+    recordActiveProbe("Clipboard text length", "unsupported", "The clipboard API was not offered here.");
+    return;
+  }
+
+  try {
+    const text = await navigator.clipboard.readText();
+    recordActiveProbe(
+      "Clipboard text length",
+      "available",
+      text ? `Clipboard text was readable: ${text.length} characters. Content was not retained.` : "Clipboard text was readable but empty.",
+      ["The page measured length only.", "No clipboard content was written to the report."],
+    );
+  } catch (error) {
+    recordActiveProbe("Clipboard text length", "blocked", safeMessage(error), ["No clipboard content was retained."]);
+  }
+}
+
+async function probeGeolocation() {
+  if (!navigator.geolocation?.getCurrentPosition) {
+    recordActiveProbe("Location prompt", "unsupported", "Geolocation was not offered here.");
+    return;
+  }
+
+  try {
+    const position = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: false,
+        maximumAge: 0,
+        timeout: 10000,
+      });
+    });
+    const coords = position.coords;
+    recordActiveProbe(
+      "Location prompt",
+      "available",
+      `Location answered with roughly ${Math.round(coords.accuracy)}m accuracy.`,
+      [
+        `Latitude: ${coords.latitude.toFixed(4)}`,
+        `Longitude: ${coords.longitude.toFixed(4)}`,
+        `Timestamp: ${new Date(position.timestamp).toISOString()}`,
+      ],
+    );
+  } catch (error) {
+    recordActiveProbe("Location prompt", "blocked", safeMessage(error), ["No coordinates were retained."]);
+  }
+}
+
+async function probeMediaDevices() {
+  if (!navigator.mediaDevices?.enumerateDevices) {
+    recordActiveProbe("Media device list", "unsupported", "Media device enumeration was not offered here.");
+    return;
+  }
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const details = devices.map((device, index) => {
+      const label = device.label || "label withheld";
+      return `${index + 1}. ${device.kind}: ${label}`;
+    });
+    recordActiveProbe(
+      "Media device list",
+      "available",
+      `${devices.length} media device entries were offered.`,
+      details.length ? details : ["No devices were offered."],
+    );
+  } catch (error) {
+    recordActiveProbe("Media device list", "blocked", safeMessage(error), ["No device list was retained."]);
+  }
+}
+
+async function probeWebRtcCandidates() {
+  if (!window.RTCPeerConnection) {
+    recordActiveProbe("WebRTC local candidates", "unsupported", "WebRTC was not offered here.");
+    return;
+  }
+
+  const candidates = [];
+  let peer;
+  try {
+    peer = new RTCPeerConnection({ iceServers: [] });
+    peer.createDataChannel("whispers-local-check");
+    peer.addEventListener("icecandidate", (event) => {
+      if (event.candidate?.candidate) candidates.push(event.candidate.candidate);
+    });
+    const offer = await peer.createOffer();
+    await peer.setLocalDescription(offer);
+    await wait(1400);
+
+    const details = candidates.map((candidate) => candidate.replace(/\s+/g, " ").trim());
+    recordActiveProbe(
+      "WebRTC local candidates",
+      details.length ? "available" : "unavailable",
+      details.length
+        ? `${details.length} local ICE candidate strings were produced without STUN servers.`
+        : "No local ICE candidates were offered.",
+      details.length ? details : ["No STUN servers were configured.", "No external discovery request was made."],
+    );
+  } catch (error) {
+    recordActiveProbe("WebRTC local candidates", "blocked", safeMessage(error), ["Peer connection was closed."]);
+  } finally {
+    if (peer) peer.close();
+  }
+}
+
+async function probeKeyboardLayout() {
+  if (!navigator.keyboard?.getLayoutMap) {
+    recordActiveProbe("Keyboard layout map", "unsupported", "Keyboard layout map was not offered here.");
+    return;
+  }
+
+  try {
+    const layout = await navigator.keyboard.getLayoutMap();
+    const keys = ["KeyA", "KeyQ", "KeyZ", "Digit1", "Minus", "Equal"];
+    const details = keys.map((key) => `${key}: ${layout.get(key) || "not offered"}`);
+    recordActiveProbe("Keyboard layout map", "available", "A small keyboard layout sample answered.", details);
+  } catch (error) {
+    recordActiveProbe("Keyboard layout map", "blocked", safeMessage(error), ["No layout values were retained."]);
+  }
+}
+
+async function probePersistence() {
+  if (!navigator.storage?.persist) {
+    recordActiveProbe("Persistent storage request", "unsupported", "Persistent storage request was not offered here.");
+    return;
+  }
+
+  try {
+    const granted = await navigator.storage.persist();
+    recordActiveProbe(
+      "Persistent storage request",
+      granted ? "available" : "blocked",
+      granted ? "The browser granted persistent storage mode." : "The browser did not grant persistent storage mode.",
+      ["The page did not write persistent data."],
+    );
+  } catch (error) {
+    recordActiveProbe("Persistent storage request", "blocked", safeMessage(error), ["The page did not write persistent data."]);
+  }
+}
+
+async function runActiveProbe(button) {
+  const probe = button.dataset.probe;
+  button.disabled = true;
+  const original = button.textContent;
+  button.textContent = "Running...";
+  try {
+    if (probe === "clipboard") await probeClipboard(button);
+    if (probe === "geolocation") await probeGeolocation();
+    if (probe === "media") await probeMediaDevices();
+    if (probe === "webrtc") await probeWebRtcCandidates();
+    if (probe === "keyboard") await probeKeyboardLayout();
+    if (probe === "persistence") await probePersistence();
+  } finally {
+    button.textContent = original;
+    button.disabled = false;
+  }
+}
+
 function buildReport() {
+  const activeNames = new Set(activeProbeResults.map((result) => result.name));
   return {
     report: "whispers local telemetry scan",
     generatedAt: new Date().toISOString(),
@@ -391,12 +607,14 @@ function buildReport() {
     privacy: {
       networkCallsMadeByPage: false,
       persistentStorageWritesMadeByPage: false,
-      activePermissionPromptsOpened: false,
-      clipboardReadAttempted: false,
-      mediaDeviceEnumerationAttempted: false,
-      geolocationPromptAttempted: false,
-      webRtcIpDiscoveryAttempted: false,
+      activePermissionPromptsOpened: activeNames.has("Location prompt"),
+      clipboardReadAttempted: activeNames.has("Clipboard text length"),
+      mediaDeviceEnumerationAttempted: activeNames.has("Media device list"),
+      geolocationPromptAttempted: activeNames.has("Location prompt"),
+      webRtcIpDiscoveryAttempted: activeNames.has("WebRTC local candidates"),
+      persistentStorageRequestAttempted: activeNames.has("Persistent storage request"),
     },
+    activeProbes: activeProbeResults,
     signals: signals.map((signal) => ({
       label: signal.label,
       category: signal.category,
@@ -460,6 +678,9 @@ function setDisclosure(button, panel, open) {
 
 function bindDisclosures() {
   els.exportReport.addEventListener("click", downloadReport);
+  for (const button of document.querySelectorAll(".probe-button")) {
+    button.addEventListener("click", () => runActiveProbe(button));
+  }
 
   els.machineryToggle.addEventListener("click", () => {
     const open = els.machineryPanel.hidden;

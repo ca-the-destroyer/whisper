@@ -449,6 +449,83 @@ h2 {
   opacity: 0.48;
 }
 
+.probe-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.7rem;
+  margin-top: 1rem;
+}
+
+.probe-button {
+  min-height: 3rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(135deg, rgba(102, 255, 191, 0.08), transparent 55%),
+    var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.probe-button:hover,
+.probe-button:focus-visible {
+  border-color: var(--accent-cool);
+  box-shadow: 0 0 24px rgba(102, 255, 191, 0.12);
+  outline: none;
+}
+
+.probe-button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.probe-results {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.probe-result {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent-cool);
+  border-radius: var(--radius);
+  background: rgba(7, 19, 26, 0.74);
+  padding: 0.85rem;
+}
+
+.probe-result[data-state="blocked"],
+.probe-result[data-state="unsupported"] {
+  border-left-color: var(--bad);
+}
+
+.probe-result h3 {
+  margin: 0 0 0.45rem;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.probe-result p {
+  margin: 0;
+}
+
+.probe-result small {
+  display: block;
+  margin-top: 0.45rem;
+  color: var(--quiet);
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.probe-result ul {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.65rem 0 0;
+  padding-left: 1rem;
+  color: var(--muted);
+}
+
 .aside-line {
   color: var(--accent);
   font-style: italic;
