@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="A local-only browser signal essay that adapts when the browser answers, refuses, or stays quiet."
+    />
+    <title>whispers</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <!-- you looked underneath. that counts. -->
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div id="scanOverlay" class="scan-overlay" aria-hidden="true">
+      <div class="scan-reticle scan-reticle--one"></div>
+      <div class="scan-reticle scan-reticle--two"></div>
+      <div class="scan-sweep" aria-hidden="true"></div>
+      <div id="scanTargetGrid" class="scan-target-grid"></div>
+      <div class="scan-overlay__label">LOCAL OPTIC SWEEP</div>
+    </div>
+    <div class="shell">
+      <header class="hero" data-toc="Opening">
+        <div class="hero__copy">
+          <p class="kicker">Local telemetry scan</p>
+          <h1>whispers</h1>
+          <p id="leadLine" class="lead">
+            A live, local-only scan of what the browser offers, refuses, and
+            leaves dark.
+          </p>
+        </div>
+        <aside class="trust-panel" aria-label="Privacy posture">
+          <span class="status-light" aria-hidden="true"></span>
+          <p>No network calls. No persistent storage. No invented values.</p>
+          <div class="scan-console" aria-label="Scan progress">
+            <div class="scan-console__topline">
+              <span>SCAN</span>
+              <output id="scanProgressText">00%</output>
+            </div>
+            <div class="scan-meter" aria-hidden="true">
+              <span id="scanProgressBar"></span>
+            </div>
+            <p id="scanStatus" class="scan-status" role="status" aria-live="polite">
+              Initializing local sweep.
+            </p>
+            <ol id="scanLog" class="scan-log" aria-label="Scan log"></ol>
+          </div>
+        </aside>
+      </header>
+
+      <nav class="toc" aria-label="Page sections">
+        <p>Contents</p>
+        <ol id="tocList"></ol>
+      </nav>
+
+      <main id="main">
+        <section class="section narrative" id="narrative" data-toc="What Answered">
+          <div class="section__label">Asset scan</div>
+          <div>
+            <h2>Scanning local asset.</h2>
+            <p id="narrativeText">
+              The first pass is listening. Nothing has left this device.
+            </p>
+            <p id="absenceLine" class="aside-line" hidden></p>
+          </div>
+        </section>
+
+        <section class="section ledger" id="ledger" data-toc="Ledger">
+          <div class="section__label">Ledger</div>
+          <div>
+            <h2>Telemetry modules</h2>
+            <p class="section-intro">
+              Each module opens when the browser offered more than a surface
+              reading. The scan stays inside this tab.
+            </p>
+            <div id="ledgerStandby" class="ledger-standby" role="status" aria-live="polite">
+              Report modules withheld until the local sweep completes.
+            </div>
+            <div id="ledgerGrid" class="ledger-grid" aria-live="polite"></div>
+          </div>
+        </section>
+
+        <section class="section crumbs" id="breadcrumbs" data-toc="Breadcrumbs">
+          <div class="section__label">Breadcrumbs</div>
+          <div>
+            <h2>Where each whisper came from</h2>
+            <div id="breadcrumbList" class="breadcrumb-list"></div>
+          </div>
+        </section>
+
+        <section class="section machinery" id="machinery" data-toc="Machinery">
+          <div class="section__label">Machinery</div>
+          <div>
+            <div class="section-heading-row">
+              <h2>Show me the machinery</h2>
+              <button id="machineryToggle" class="text-button" type="button" aria-expanded="false">
+                Open
+              </button>
+            </div>
+            <div id="machineryPanel" class="machinery-panel" hidden>
+              <p>
+                Choose which categories contribute to the local fingerprint. The
+                hash is computed here, forgotten on refresh, and never sent.
+              </p>
+              <div id="categoryControls" class="category-controls"></div>
+              <output id="fingerprintHash" class="hash-output">Waiting for choices.</output>
+              <p id="instabilityNote" class="aside-line" hidden>
+                Identity, it turns out, is brittle.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="section confessions" id="confessions" data-toc="Sources & Confessions">
+          <div class="section__label">Sources</div>
+          <div>
+            <div class="section-heading-row">
+              <h2>Sources &amp; Confessions</h2>
+              <button id="confessionsToggle" class="text-button" type="button" aria-expanded="false">
+                Open
+              </button>
+            </div>
+            <div id="confessionsPanel" class="confessions-panel" hidden>
+              <ul>
+                <li>The page uses only browser APIs available to this page.</li>
+                <li>Unsupported or blocked capabilities are described without raw errors.</li>
+                <li>The fingerprint hash is a local demonstration, not an identity claim.</li>
+                <li>No cookies, localStorage, beacons, analytics, or remote assets are used.</li>
+              </ul>
+              <p id="secondQuestionNote" class="aside-line" hidden>
+                You asked the second question. That is usually where the truth starts.
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p id="marginSecret" class="margin-secret" role="status" aria-live="polite" hidden>
+      Some doors open only because they remember being doors.
+    </p>
+    <!-- no beacon waits in the wall. -->
+    <script src="./src/prose.js"></script>
+    <script src="./src/easter-eggs.js"></script>
+    <script src="./src/signals.js"></script>
+    <script src="./src/app.js"></script>
+  </body>
+</html>
